@@ -194,7 +194,8 @@ class UVVisApp(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)  # Full height
 
         # --- Left Panel (Controls) ---
-        self.left_frame = ctk.CTkFrame(self, width=250, corner_radius=0)
+        # ZMIANA: Używamy CTkScrollableFrame zamiast CTkFrame
+        self.left_frame = ctk.CTkScrollableFrame(self, width=250, corner_radius=0)
         self.left_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
         self.create_controls()
@@ -221,58 +222,131 @@ class UVVisApp(ctk.CTk):
                                         font=ctk.CTkFont(size=14, weight="bold"))
         self.table_label.pack(pady=5)
 
-        # ZMIANA: wrap="none" wyłącza zawijanie, font Courier
+        # Table Textbox
         self.table_text = ctk.CTkTextbox(self.table_frame, font=("Courier", 12), wrap="none")
         self.table_text.pack(expand=True, fill="both", padx=5, pady=5)
         self.table_text.configure(state="disabled")
 
     def create_controls(self):
-        # Title
+        # Licznik rzędów
+        curr_row = 0
+
+        # Title Section
         lbl_title = ctk.CTkLabel(self.left_frame, text="Parameters", font=ctk.CTkFont(size=20, weight="bold"))
-        lbl_title.grid(row=0, column=0, padx=20, pady=(20, 10))
+        lbl_title.grid(row=curr_row, column=0, padx=20, pady=(20, 10))
+        curr_row += 1
 
         # File Loader
         self.btn_load = ctk.CTkButton(self.left_frame, text="Open Log File", command=self.load_file)
-        self.btn_load.grid(row=1, column=0, padx=20, pady=10)
+        self.btn_load.grid(row=curr_row, column=0, padx=20, pady=10)
+        curr_row += 1
 
-        # Parameters (Teraz podajemy nazwę zmiennej jawnie jako ostatni argument)
-        self.add_param_input(2, "FWHM (σ) [eV]:", "0.4", "entry_fwhm")
-        self.add_param_input(3, "Min Wavelength [nm]:", "200", "entry_min")
-        self.add_param_input(4, "Max Wavelength [nm]:", "700", "entry_max")
-        self.add_param_input(5, "Step [nm]:", "1.0", "entry_step")
-        self.add_param_input(6, "Osc. Strength Threshold:", "0.005", "entry_osc")  # Tu był błąd
+        # Plot Title Input
+        self.add_param_input(curr_row, "Plot Title:", "", "entry_title")
+        curr_row += 2
 
-        # NOWE POLA - WYMIARY WYKRESU
-        ctk.CTkLabel(self.left_frame, text="Figure Size", font=ctk.CTkFont(size=14, weight="bold")).grid(row=7,
+        # Separator
+        ctk.CTkFrame(self.left_frame, height=2, fg_color="gray50").grid(row=curr_row, column=0, sticky="ew", padx=20,
+                                                                        pady=10)
+        curr_row += 1
+
+        # Parameters
+        self.add_param_input(curr_row, "FWHM (σ) [eV]:", "0.4", "entry_fwhm")
+        curr_row += 2
+
+        self.add_param_input(curr_row, "Min Wavelength [nm]:", "200", "entry_min")
+        curr_row += 2
+
+        self.add_param_input(curr_row, "Max Wavelength [nm]:", "700", "entry_max")
+        curr_row += 2
+
+        self.add_param_input(curr_row, "Step [nm]:", "1.0", "entry_step")
+        curr_row += 2
+
+        self.add_param_input(curr_row, "Osc. Strength Threshold:", "0.005", "entry_osc")
+        curr_row += 2
+
+        # Figure Size Section
+        ctk.CTkLabel(self.left_frame, text="Figure Size", font=ctk.CTkFont(size=14, weight="bold")).grid(row=curr_row,
                                                                                                          column=0,
                                                                                                          pady=(15, 5))
-        self.add_param_input(8, "Width [cm]:", "15.0", "entry_width")
-        self.add_param_input(9, "Height [cm]:", "10.0", "entry_height")
+        curr_row += 1
 
-        # Update Button (przesuwamy go niżej)
+        self.add_param_input(curr_row, "Width [cm]:", "15.0", "entry_width")
+        curr_row += 2
+
+        self.add_param_input(curr_row, "Height [cm]:", "10.0", "entry_height")
+        curr_row += 2
+
+        # Update Button
         self.btn_update = ctk.CTkButton(self.left_frame, text="Update Plot & Table", command=self.update_view,
                                         fg_color="green")
-        self.btn_update.grid(row=10, column=0, padx=20, pady=20)
+        self.btn_update.grid(row=curr_row, column=0, padx=20, pady=20)
+        curr_row += 1
 
-        # Export Section (również przesuwamy niżej)
-        ctk.CTkLabel(self.left_frame, text="Export", font=ctk.CTkFont(size=16, weight="bold")).grid(row=11, column=0,
+        # Export Section
+        ctk.CTkLabel(self.left_frame, text="Export", font=ctk.CTkFont(size=16, weight="bold")).grid(row=curr_row,
+                                                                                                    column=0,
                                                                                                     pady=(10, 5))
+        curr_row += 1
 
-        self.btn_save_csv = ctk.CTkButton(self.left_frame, text="Save Data (CSV)", command=self.save_csv)
-        self.btn_save_csv.grid(row=12, column=0, padx=20, pady=5)
+        # ZMIANA: Przycisk eksportu do Excela zamiast CSV
+        self.btn_save_excel = ctk.CTkButton(self.left_frame, text="Save Data (XLSX)", command=self.save_excel)
+        self.btn_save_excel.grid(row=curr_row, column=0, padx=20, pady=5)
+        curr_row += 1
 
         self.btn_save_fig = ctk.CTkButton(self.left_frame, text="Save Figure (600 dpi)", command=self.save_figure)
-        self.btn_save_fig.grid(row=13, column=0, padx=20, pady=5)
+        self.btn_save_fig.grid(row=curr_row, column=0, padx=20, pady=5)
+        curr_row += 1
+
+    def save_excel(self):
+        if self.df_spectrum is None or self.df_raw is None:
+            messagebox.showwarning("Warning", "No spectrum generated yet. Load a file and update first.")
+            return
+
+        # Pobieramy ścieżkę zapisu
+        path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx")])
+        if not path:
+            return
+
+        try:
+            # 1. Pobieramy aktualny próg (threshold) z GUI, aby przygotować arkusz "Filtered"
+            try:
+                threshold = float(self.entry_osc.get())
+            except ValueError:
+                threshold = 0.0
+
+            # 2. Tworzymy przefiltrowaną ramkę danych (taką samą jak w tabeli GUI)
+            df_filtered = self.df_raw[self.df_raw['Oscillator Strength (f)'] >= threshold].copy()
+
+            # 3. Zapis do Excela z podziałem na arkusze
+            # Używamy engine='openpyxl' (standard w pandas dla xlsx)
+            with pd.ExcelWriter(path, engine='openpyxl') as writer:
+                # Arkusz 1: Widmo (dane wykresu)
+                self.df_spectrum.to_excel(writer, sheet_name='Spectrum Data', index=False)
+
+                # Arkusz 2: Wszystkie przejścia (surowe dane z logu)
+                self.df_raw.to_excel(writer, sheet_name='All Transitions', index=False)
+
+                # Arkusz 3: Tylko istotne przejścia (przefiltrowane)
+                df_filtered.to_excel(writer, sheet_name='Filtered Transitions', index=False)
+
+            messagebox.showinfo("Success",
+                                "Data exported to Excel successfully.\nSheets: Spectrum, All Transitions, Filtered Transitions.")
+
+        except Exception as e:
+            messagebox.showerror("Export Error", f"An error occurred while saving:\n{str(e)}")
 
     def add_param_input(self, row, label_text, default_val, attr_name):
+        # Etykieta w rzędzie `row`
         lbl = ctk.CTkLabel(self.left_frame, text=label_text, anchor="w")
         lbl.grid(row=row, column=0, padx=20, pady=(5, 0), sticky="w")
 
+        # Pole tekstowe w rzędzie `row + 1` (bezpośrednio pod etykietą)
         entry = ctk.CTkEntry(self.left_frame)
         entry.insert(0, default_val)
-        entry.grid(row=row + 100, column=0, padx=20, pady=(0, 10), sticky="ew")
+        entry.grid(row=row + 1, column=0, padx=20, pady=(0, 10), sticky="ew")
 
-        # Bezpośrednie przypisanie nazwy atrybutu
         setattr(self, attr_name, entry)
 
     def init_plot(self):
@@ -314,6 +388,12 @@ class UVVisApp(ctk.CTk):
             df, error = parse_gaussian_log(file_path)
             if df is not None:
                 self.df_raw = df
+
+                # Automatyczne ustawienie tytułu na nazwę pliku
+                filename = os.path.basename(file_path)
+                self.entry_title.delete(0, "end")
+                self.entry_title.insert(0, filename)
+
                 messagebox.showinfo("Success", f"Loaded {len(df)} excited states.")
                 self.update_view()
             else:
@@ -342,7 +422,6 @@ class UVVisApp(ctk.CTk):
 
         params = self.get_params()
         if not params: return
-        # Rozpakowujemy teraz więcej zmiennych
         sigma, l_min, l_max, l_step, thresh, w_cm, h_cm = params
 
         # 1. Update Spectrum Data
@@ -352,8 +431,7 @@ class UVVisApp(ctk.CTk):
         self.ax1.clear()
         self.ax2.clear()
 
-        # NOWE: Ustawienie rozmiaru figury (cm -> cale)
-        # 1 cal = 2.54 cm
+        # Ustawienie rozmiaru figury
         self.fig.set_size_inches(w_cm / 2.54, h_cm / 2.54)
 
         # Plot Spectrum (Blue Line)
@@ -383,8 +461,15 @@ class UVVisApp(ctk.CTk):
         self.ax1.tick_params(axis='y', colors='blue')
         self.ax2.tick_params(axis='y', colors='red')
 
-        title = os.path.basename(self.current_filepath) if self.current_filepath else "Spectrum"
-        self.ax1.set_title(f"{title} (σ = {sigma} eV)", fontsize=14, color='black')
+        # Pobieranie tytułu z pola GUI
+        custom_title = self.entry_title.get()
+        # Jeśli puste, użyj nazwy pliku, jeśli też brak, użyj "Spectrum"
+        if not custom_title:
+            custom_title = os.path.basename(self.current_filepath) if self.current_filepath else "Spectrum"
+
+        # Dodajemy informację o Sigmie do tytułu
+        full_title = f"{custom_title} (σ = {sigma} eV)"
+        self.ax1.set_title(full_title, fontsize=14, color='black')
 
         # Layout update
         self.fig.tight_layout()
