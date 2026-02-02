@@ -19,9 +19,17 @@ EPSILON_PREFACTOR = 1.3062974e8
 
 
 # --- Math Logic (Ported from your script) ---
+def calculate_ideal_s2(multiplicity):
+    """
+    Oblicza idealną wartość <S**2> dla danej multipletowości M.
+    Wzór: S(S+1), gdzie S = (M-1)/2
+    """
+    s = (multiplicity - 1) / 2
+    return s * (s + 1)
+
 
 def parse_gaussian_log(filepath):
-    """Parses Gaussian log file for Excited States."""
+    """Parses Gaussian log file for Excited States checking for Spin Contamination."""
     excited_states = []
 
     try:
@@ -32,7 +40,21 @@ def parse_gaussian_log(filepath):
 
     lines = content.splitlines()
 
-    # Regex patterns
+    # 1. Szukamy multipletowości stanu podstawowego (Ground State)
+    # Zazwyczaj występuje w linii: "Charge =  0 Multiplicity = 1"
+    mult_pattern = re.compile(r"Charge\s*=\s*[-+]?\d+\s+Multiplicity\s*=\s*(\d+)")
+    ground_state_mult = 1  # Domyślnie singlet
+
+    # Szukamy ostatniego wystąpienia (w przypadku Link1 lub wielu zadań w jednym pliku)
+    # lub pierwszego przed sekcją TD. Dla uproszczenia bierzemy pierwsze znalezione.
+    match_mult = mult_pattern.search(content)
+    if match_mult:
+        ground_state_mult = int(match_mult.group(1))
+
+    ideal_ground_s2 = calculate_ideal_s2(ground_state_mult)
+
+    # 2. Regex dla stanów wzbudzonych
+    # Zmodyfikowany, by lepiej łapać różne formaty Gaussian
     excited_state_pattern = re.compile(
         r"^\s*Excited State\s+(\d+):\s+(.+?)\s+([-+]?\d*\.\d+)\s+eV\s+([-+]?\d*\.\d+)\s+nm\s+f=([-+]?\d*\.\d+)\s+<S\*\*2>=([-+]?\d*\.\d+)"
     )
@@ -44,22 +66,47 @@ def parse_gaussian_log(filepath):
     for i, line in enumerate(lines):
         match_state = excited_state_pattern.match(line)
         if match_state:
+            # Zapisz poprzedni stan, jeśli istnieje
             if current_state_data:
                 current_state_data['Transitions'] = " | ".join(current_state_transitions)
                 excited_states.append(current_state_data)
 
-            state_num, symmetry, energy_ev, wavelength_nm, osc_strength, s2 = match_state.groups()
+            state_num, label_sym, energy_ev, wavelength_nm, osc_strength, s2_obs = match_state.groups()
+            s2_obs = float(s2_obs)
+
+            # Logika oznaczania spinu
+            spin_comment = "OK"
+            expected_s2 = ideal_ground_s2  # Domyślnie zakładamy spin-allowed transition
+
+            # Sprawdź czy to Restricted (Singlet/Triplet w nazwie)
+            label_lower = label_sym.lower()
+            if "singlet" in label_lower:
+                expected_s2 = 0.0
+            elif "triplet" in label_lower:
+                expected_s2 = 2.0
+            else:
+                # Metody Unrestricted (Open-Shell) lub brak jasnej etykiety
+                # Sprawdzamy, czy stan jest bliski stanowi podstawowemu czy zmianie spinu
+                # Np. dla M=7 (S=3) <S^2>=12. Stan 'spin-flip' miałby inne wartości.
+                # Dla uproszczenia w tabeli pokażemy różnicę względem GS.
+                pass
+
+            diff_s2 = s2_obs - expected_s2
+
             current_state_data = {
                 "State": int(state_num),
-                "Symmetry": symmetry,
+                "Symmetry": label_sym.strip(),
                 "Energy (eV)": float(energy_ev),
                 "Wavelength (nm)": float(wavelength_nm),
                 "Oscillator Strength (f)": float(osc_strength),
-                "<S**2>": float(s2),
+                "<S**2>": s2_obs,
+                "Ideal <S**2>": expected_s2,
+                "Dev": diff_s2,  # Odchylenie
                 "Transitions": ""
             }
             current_state_transitions = []
 
+            # Parsowanie orbitali (bez zmian)
             j = i + 1
             while j < len(lines):
                 line_trans = lines[j].strip()
@@ -82,6 +129,10 @@ def parse_gaussian_log(filepath):
 
     df = pd.DataFrame(excited_states)
     df['Energy (cm^-1)'] = df['Energy (eV)'] * EV_TO_CM1
+
+    # Zapisujemy informację o multipletowości GS w atrybucie DataFrame (opcjonalnie)
+    df.attrs['GS_Multiplicity'] = ground_state_mult
+
     return df, None
 
 
@@ -348,37 +399,48 @@ class UVVisApp(ctk.CTk):
         # Filtrowanie
         df_filtered = self.df_raw[self.df_raw['Oscillator Strength (f)'] >= threshold].copy()
 
-        # Przygotowanie danych do wyświetlenia (zaokrąglanie)
+        # Zaokrąglanie
         df_filtered['Energy (eV)'] = df_filtered['Energy (eV)'].round(4)
         df_filtered['Wavelength (nm)'] = df_filtered['Wavelength (nm)'].round(2)
         df_filtered['Oscillator Strength (f)'] = df_filtered['Oscillator Strength (f)'].round(4)
-        # Zaokrąglamy S**2 (zazwyczaj 4 miejsca po przecinku wystarczą)
-        df_filtered['<S**2>'] = df_filtered['<S**2>'].round(4)
+        df_filtered['<S**2>'] = df_filtered['<S**2>'].round(3)
 
-        # Odblokowanie pola do edycji
+        # Pobieramy Ideal <S**2> z ramki danych, jeśli istnieje
+        if 'Ideal <S**2>' in df_filtered.columns:
+            df_filtered['Ideal <S**2>'] = df_filtered['Ideal <S**2>'].round(2)
+
         self.table_text.configure(state="normal")
         self.table_text.delete("1.0", "end")
 
         if df_filtered.empty:
             self.table_text.insert("end", f"No transitions found with f >= {threshold}")
         else:
-            # ZMIANA: Dodano kolumnę <S**2> do nagłówka (szerokość 10 znaków)
-            header = f"{'State':<8} {'E (eV)':<12} {'Lambda (nm)':<14} {'f':<12} {'<S**2>':<10} {'Transitions'}"
+            # Nowy, szerszy nagłówek
+            # State | Energy | Lambda | osc. f | <S^2> | Ideal | Dev | Trans
+            header = f"{'St.':<4} {'E (eV)':<8} {'λ (nm)':<10} {'f':<10} {'<S²>':<8} {'Ideal':<6} {'Dev':<6} {'Transitions'}"
 
             self.table_text.insert("end", header + "\n")
-            self.table_text.insert("end", "-" * 130 + "\n")  # Wydłużyłem nieco linię oddzielającą
+            self.table_text.insert("end", "-" * 140 + "\n")
 
             for _, row in df_filtered.iterrows():
-                # ZMIANA: Dodano wartość <S**2> do wiersza
-                line = (f"{row['State']:<8} "
-                        f"{row['Energy (eV)']:<12} "
-                        f"{row['Wavelength (nm)']:<14} "
-                        f"{row['Oscillator Strength (f)']:<12} "
-                        f"{row['<S**2>']:<10} "
+                # Ostrzeżenie wizualne (gwiazdka), jeśli kontaminacja jest duża (> 10% różnicy)
+                dev = row.get('Dev', 0.0)
+                ideal = row.get('Ideal <S**2>', 0.0)
+
+                # Prosta logika ostrzeżeń:
+                # Jeśli dewiacja > 0.5 (znacząca kontaminacja), dodaj "!"
+                warn_mark = "!" if abs(dev) > 0.5 else " "
+
+                line = (f"{row['State']:<4} "
+                        f"{row['Energy (eV)']:<8} "
+                        f"{row['Wavelength (nm)']:<10} "
+                        f"{row['Oscillator Strength (f)']:<10} "
+                        f"{row['<S**2>']:<8} "
+                        f"{ideal:<6} "
+                        f"{dev:+.2f}{warn_mark} "  # Znak +/- i ewentualny wykrzyknik
                         f"{row['Transitions']}\n")
                 self.table_text.insert("end", line)
 
-        # Zablokowanie pola (tylko do odczytu)
         self.table_text.configure(state="disabled")
 
     def save_csv(self):
