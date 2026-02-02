@@ -1,39 +1,39 @@
 # Gaussian UV-Vis Spectrum Generator
 
-Narzędzie typu desktop GUI (napisane w Pythonie) służące do analizy i wizualizacji widm elektronowych (UV-Vis) na podstawie plików wynikowych programu Gaussian (TD-DFT).
+A desktop GUI tool (written in Python) designed for analyzing and visualizing electronic spectra (UV-Vis) based on Gaussian output files (TD-DFT).
 
-Aplikacja została stworzona z myślą o pracy naukowej – pozwala na szybką weryfikację przejść, kontrolę kontaminacji spinu oraz generowanie wykresów gotowych do publikacji.
+This application was created for scientific workflows. It allows for quick verification of electronic transitions, monitoring of spin contamination, and generation of publication-ready plots.
 
-## Główne funkcjonalności
+## Key Features
 
-* **Wczytywanie danych**: Obsługa standardowych plików logów Gaussiana (`.log`, `.out`).
-* **Wizualizacja**:
-    * Interaktywny wykres widma (splot gaussowski) oraz przejść (sticks).
-    * Estetyka "publication-ready" (białe tło, wyraźne osie).
-    * Możliwość definiowania szerokości połówkowej (FWHM/$\sigma$).
-* **Analiza danych**:
-    * Tabela przejść z filtrowaniem po sile oscylatora ($f$).
-    * **Weryfikacja spinu**: Automatyczne porównanie obliczonego $<S^2>$ z wartością idealną i oznaczanie stanów z dużą kontaminacją spinu.
-* **Eksport**:
-    * **Excel (.xlsx)**: Zapis danych do jednego pliku z podziałem na arkusze: widmo (punkty), surowe przejścia oraz przejścia przefiltrowane.
-    * **Grafika**: Zapis wykresów do formatów PNG, PDF lub SVG (domyślnie 600 DPI).
+* **Data Loading**: Supports standard Gaussian 16 log files (`.log`, `.out`).
+* **Visualization**:
+    * Interactive spectrum plot (Gaussian convolution) and transition sticks.
+    * "Publication-ready" aesthetics (white background, clear axes).
+    * Adjustable Full Width at Half Maximum (FWHM/$\sigma$).
+* **Data Analysis**:
+    * Transition table with filtering by oscillator strength ($f$).
+    * **Spin Verification**: Automatic comparison of calculated $<S^2>$ vs. ideal values to flag states with significant spin contamination.
+* **Export**:
+    * **Excel (.xlsx)**: Exports data to a single file with separate sheets: spectrum data, all transitions, and filtered transitions.
+    * **Figures**: Saves plots as PNG, PDF, or SVG (default 600 DPI).
 
-## Wymagania
+## Requirements
 
-Skrypt wymaga Pythona 3 oraz następujących bibliotek:
+The script requires Python 3 and the following libraries:
 
 * `customtkinter` (GUI)
-* `pandas` & `numpy` (analiza danych)
-* `matplotlib` (wykresy)
-* `openpyxl` (obsługa zapisu do Excela)
+* `pandas` & `numpy` (data analysis)
+* `matplotlib` (plotting)
+* `openpyxl` (Excel export support)
 
-## Instalacja i uruchomienie
+## Installation and Usage
 
-1.  Zainstaluj wymagane biblioteki:
+1.  Install the required libraries:
     ```bash
     pip install customtkinter pandas matplotlib numpy openpyxl
     ```
-2.  Uruchom skrypt:
+2.  Run the script:
     ```bash
     python main_ctk.py
     ```
